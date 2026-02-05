@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="icon.png" alt="Scrcpy Ultra Launcher" width="128">
+  <img src="internal/icon.png" alt="Scrcpy Ultra Launcher" width="128">
 </p>
 
 <h1 align="center">Scrcpy Ultra Launcher</h1>
@@ -139,10 +139,13 @@ python -m PyInstaller --noconsole --onefile --icon=icon.ico --name=scrcpy --add-
 Scrcpy-Ultra-Launcher/
 ├── main.py              # 主程序入口
 ├── icon.ico             # 程序图标
-├── icon.png             # PNG 图标 (备用)
 ├── config.json          # 用户配置文件
 ├── README.md            # 说明文档
-└── scrcpy.spec          # PyInstaller 配置
+├── scrcpy.spec          # PyInstaller 配置
+└── internal/            # 内部资源目录
+    ├── icon.png         # PNG 图标 (用于 README)
+    ├── scrcpy-core.exe  # Scrcpy 核心程序
+    └── ...
 ```
 
 ---
