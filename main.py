@@ -698,6 +698,9 @@ class ScrcpyLauncher(ctk.CTk):
         # Hotplug detection debounce
         self._refresh_scheduled = None  # Stores the after() ID for debounce
         self._device_monitor = None  # Device monitor thread
+        
+        # User custom settings flag - skip auto-config when True
+        self._user_has_custom_settings = False
     
     def _create_widgets(self) -> None:
         """Create all UI widgets."""
@@ -1389,6 +1392,9 @@ class ScrcpyLauncher(ctk.CTk):
                 # Restore tutorial setting (default True for first-time users)
                 self.show_tutorial = config.get("show_tutorial", True)
                 
+                # Restore user custom settings flag
+                self._user_has_custom_settings = config.get("user_has_custom_settings", False)
+                
                 print(f"[INFO] Config loaded from {self.CONFIG_FILE}")
             else:
                 self.last_wireless_ip = ""
@@ -1422,6 +1428,7 @@ class ScrcpyLauncher(ctk.CTk):
             "fps": fps,
             "bitrate": bitrate,
             "codec": codec,
+            "user_has_custom_settings": getattr(self, "_user_has_custom_settings", False),
             "screen_off": screen_off,
             "last_ip": getattr(self, "last_wireless_ip", ""),
             "language": getattr(self, "current_lang", "zh"),
@@ -1445,7 +1452,8 @@ class ScrcpyLauncher(ctk.CTk):
             "screen_off": self.screen_off_on_start.get(),
             "last_ip": getattr(self, "last_wireless_ip", ""),
             "language": self.current_lang,
-            "show_tutorial": getattr(self, "show_tutorial", True)
+            "show_tutorial": getattr(self, "show_tutorial", True),
+            "user_has_custom_settings": getattr(self, "_user_has_custom_settings", False)
         }
         try:
             with open(config_path, "w", encoding="utf-8") as f:
@@ -1459,6 +1467,10 @@ class ScrcpyLauncher(ctk.CTk):
         # Stop device monitor thread
         if self._device_monitor:
             self._device_monitor.stop()
+        
+        # Terminate AltSnap if we started it
+        self._stop_altsnap()
+        
         self._save_config()
         self.destroy()
     
@@ -1515,7 +1527,7 @@ class ScrcpyLauncher(ctk.CTk):
         # IMPORTANT: cwd must be set to tools_dir so AltSnap can find hooks.dll and AltSnap.ini
         # Use -h flag to hide tray icon (silent mode)
         try:
-            subprocess.Popen(
+            self._altsnap_process = subprocess.Popen(
                 [altsnap_path, "-h"],
                 cwd=self.tools_dir,
                 creationflags=subprocess.CREATE_NO_WINDOW
@@ -1523,6 +1535,23 @@ class ScrcpyLauncher(ctk.CTk):
             self._log("[INFO] AltSnap 已静默启动 (按住 Alt + 鼠标左键拖动窗口)")
         except Exception as e:
             self._log(f"[WARN] 启动 AltSnap 失败: {e}")
+    
+    def _stop_altsnap(self) -> None:
+        """Stop AltSnap process if we started it."""
+        if hasattr(self, '_altsnap_process') and self._altsnap_process:
+            try:
+                self._altsnap_process.terminate()
+                self._altsnap_process.wait(timeout=2)
+                print("[INFO] AltSnap 已关闭")
+            except Exception as e:
+                print(f"[WARN] 关闭 AltSnap 失败: {e}")
+                # Force kill if terminate failed
+                try:
+                    self._altsnap_process.kill()
+                except Exception:
+                    pass
+            finally:
+                self._altsnap_process = None
     
     def _schedule_refresh(self) -> None:
         """Schedule a device refresh with debounce (1 second delay).
@@ -2106,11 +2135,14 @@ class ScrcpyLauncher(ctk.CTk):
             self._log(LOCALE["log_found_devices"][self.current_lang].format(count=len(display_names)))
             
             # Apply auto-config for the first device (or selected)
-            # Find serial for current device
-            current_display = self.selected_device.get()
-            current_serial = self._device_serial_map.get(current_display)
-            if current_serial:
-                self._apply_auto_config(current_serial)
+            # Only if user has NOT set custom settings before
+            if not self._user_has_custom_settings:
+                current_display = self.selected_device.get()
+                current_serial = self._device_serial_map.get(current_display)
+                if current_serial:
+                    self._apply_auto_config(current_serial)
+            else:
+                self._log("[INFO] 使用用户上次保存的投屏参数")
         else:
             no_device_text = LOCALE["no_device"][self.current_lang]
             self.device_dropdown.configure(values=[no_device_text], state="disabled")
@@ -2169,6 +2201,9 @@ class ScrcpyLauncher(ctk.CTk):
         if not display_name or display_name in ("Scanning...", "正在扫描...", LOCALE["scanning"]["zh"], LOCALE["scanning"]["en"], LOCALE["no_device"]["zh"], LOCALE["no_device"]["en"]):
             self._log(LOCALE["log_no_valid_device"][self.current_lang])
             return
+        
+        # Mark that user now has custom settings (will be saved on next config save)
+        self._user_has_custom_settings = True
         
         # Get the actual serial from the display name mapping
         device_serial_map = getattr(self, "_device_serial_map", {})
