@@ -1,0 +1,11 @@
+{
+  "resolution": "Native",
+  "fps": "120 fps",
+  "bitrate": 40,
+  "codec": "H.265 (High Quality)",
+  "screen_off": false,
+  "last_ip": "",
+  "language": "zh",
+  "show_tutorial": false,
+  "user_has_custom_settings": true
+}

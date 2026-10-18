@@ -62,27 +62,28 @@
 
 ## 📦 安装部署
 
-本项目采用 **"狸猫换太子"** 部署方式，无缝替换原版 Scrcpy 入口。
+本项目支持将官方 Scrcpy 解压至 `internal` 目录直接运行，无需手动重命名核心文件。
 
 ### 快速安装
 
-1. 下载 [Scrcpy 官方原版](https://github.com/Genymobile/scrcpy/releases) (v2.0+) 并解压
-2. 进入 Scrcpy 目录，将 `scrcpy.exe` **重命名**为 `scrcpy-core.exe`
-3. 下载本项目的 `scrcpy.exe`（使用 PyInstaller 打包 `main.py` 生成），放入同一目录
-4. 双击 `scrcpy.exe` 即可使用！
+1. 下载 [Scrcpy 官方原版](https://github.com/Genymobile/scrcpy/releases) (v2.0+) 压缩包并解压
+2. 将解压出的所有文件放入本项目的 `internal` 文件夹中（原版 `scrcpy.exe` 无需重命名）
+3. 运行本项目的 `scrcpy.exe`（或在开发环境中运行 `python main.py`）
+4. 双击即可直接使用！
 
 ### 目录结构
 
 ```
 Scrcpy-Folder/
 ├── scrcpy.exe           ← 本启动器 (GUI Launcher)
-├── scrcpy-core.exe      ← 原版核心程序 (重命名后)
-├── scrcpy-server        ← Scrcpy 服务端
-├── adb.exe              ← Android Debug Bridge
-├── icon.ico             ← 程序图标 (可选)
 ├── config.json          ← 用户配置 (自动生成)
-├── *.dll                ← 依赖库
-└── ...
+├── icon.ico             ← 程序图标 (可选)
+└── internal/            ← Scrcpy 官方原版解压目录
+    ├── scrcpy.exe       ← 原版核心程序 (无需重命名)
+    ├── scrcpy-server    ← Scrcpy 服务端
+    ├── adb.exe          ← Android Debug Bridge
+    ├── *.dll            ← 依赖库
+    └── tools/           ← 辅助工具 (AltSnap等)
 ```
 
 ---
@@ -94,12 +95,11 @@ Scrcpy-Folder/
 当 Scrcpy 官方发布新版本时，您只需：
 
 1. 下载最新版 [Scrcpy Release](https://github.com/Genymobile/scrcpy/releases)
-2. 解压并将 **新版 `scrcpy.exe` 重命名为 `scrcpy-core.exe`**
-3. 用新文件**覆盖**旧目录中的 `scrcpy-core.exe`、`scrcpy-server`、`adb.exe` 及相关 DLL
-4. 保留本启动器的 `scrcpy.exe`(也可以使用PyInstaller重新打包main.py) 和 `config.json` **不动**
-5. 完成！启动器会自动调用新版核心
+2. 解压并直接**覆盖** `internal` 目录中的所有文件（包括 `scrcpy.exe`、`scrcpy-server`、`adb.exe` 及相关 DLL）
+3. 保留本启动器的 `scrcpy.exe` 和 `config.json` **不动**
+4. 完成！启动器会自动调用新版核心
 
-**原理**：本启动器仅负责 GUI 界面和参数组装，实际投屏功能由 `scrcpy-core.exe` 执行。两者通过命令行参数通信，无版本耦合。
+**原理**：本启动器仅负责 GUI 界面和参数组装，实际投屏功能由 `internal/scrcpy.exe` 执行。两者通过命令行参数通信，无版本耦合。
 
 ---
 
@@ -121,7 +121,7 @@ pip install customtkinter packaging pillow psutil pyinstaller
 ### 2. 开发环境运行
 
 ```bash
-# 确保目录中已有 scrcpy-core.exe (重命名后的原版)
+# 确保 internal 目录中已有官方原版 scrcpy.exe（或 scrcpy-core.exe）
 python main.py
 ```
 
@@ -131,7 +131,7 @@ python main.py
 python -m PyInstaller --noconsole --onefile --icon=icon.ico --name=scrcpy --add-data "icon.ico;." main.py
 ```
 
-打包完成后，将 `dist/scrcpy.exe` 复制到 Scrcpy 目录即可。
+打包完成后，将 `dist/scrcpy.exe` 复制到项目根目录即可。
 
 ### 项目结构
 
@@ -142,9 +142,12 @@ Scrcpy-Ultra-Launcher/
 ├── config.json          # 用户配置文件
 ├── README.md            # 说明文档
 ├── scrcpy.spec          # PyInstaller 配置
-└── internal/            # 内部资源目录
+└── internal/            # 内部资源及 Scrcpy 官方核心目录
     ├── icon.png         # PNG 图标 (用于 README)
-    ├── scrcpy-core.exe  # Scrcpy 核心程序
+    ├── scrcpy.exe       # Scrcpy 官方核心程序
+    ├── adb.exe          # ADB 调试工具
+    ├── scrcpy-server    # Scrcpy 服务端
+    ├── tools/           # 辅助工具 (AltSnap)
     └── ...
 ```
 
@@ -180,9 +183,9 @@ Scrcpy-Ultra-Launcher/
 ## ❓ 常见问题
 
 <details>
-<summary><b>Q: 提示找不到 scrcpy-core.exe？</b></summary>
+<summary><b>Q: 提示找不到 scrcpy 核心程序？</b></summary>
 
-请确保已将原版 `scrcpy.exe` 重命名为 `scrcpy-core.exe`。
+请确保已将官方原版 Scrcpy 压缩包解压至 `internal/` 目录下（目录中需包含 `scrcpy.exe` 或 `scrcpy-core.exe`）。
 </details>
 
 <details>

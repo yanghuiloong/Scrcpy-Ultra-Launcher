@@ -24,7 +24,7 @@ except ImportError:
 def get_base_path() -> str:
     """获取外部依赖文件的基础路径。
     
-    用于定位 scrcpy-core.exe, adb.exe, config.json 等外部文件。
+    用于定位 scrcpy 核心程序, adb.exe, config.json 等外部文件。
     - PyInstaller 打包后: 返回 EXE 所在目录
     - 开发环境: 返回脚本所在目录
     """
@@ -138,12 +138,14 @@ LOCALE = {
     "lbl_fps": {"zh": "帧率限制 (Max FPS)", "en": "Max FPS"},
     "lbl_codec": {"zh": "视频编码 (Codec)", "en": "Video Codec"},
     "lbl_bitrate": {"zh": "传输码率 (Bitrate)", "en": "Bitrate"},
+    "stay_awake": {"zh": "保持常亮 (防休眠断开)", "en": "Stay Awake (Prevent Sleep)"},
     "screen_off": {"zh": "启动即熄屏", "en": "Turn Screen Off"},
     "screen_off_warning": {"zh": "⚠️ 若有锁屏密码，投屏可能无法显示解锁界面。\n     建议取消勾选，连接后按 LCtrl+O 熄屏。", "en": "⚠️ If you have a lock screen, the unlock UI may not display.\n     Recommend: uncheck this, then press LCtrl+O after connected."},
     "borderless": {"zh": "无边框模式", "en": "Borderless Mode"},
     "borderless_hint": {"zh": "💡 提示：已启用智能辅助。按住 Alt + 鼠标左键 即可自由拖动窗口。", "en": "💡 Tip: Smart assist enabled. Hold Alt + Left-click to drag window."},
     "show_log": {"zh": "显示运行日志", "en": "Show Log"},
     "print_fps": {"zh": "在日志中打印 FPS", "en": "Print FPS to Log"},
+    "auto_exit": {"zh": "投屏关闭后退出启动器", "en": "Exit on Mirror Close"},
     "lbl_position": {"zh": "窗口位置 (Window Position)", "en": "Window Position"},
     "position_center": {"zh": "居中 (Center)", "en": "Center"},
     "position_top_left": {"zh": "左上角 (Top-Left)", "en": "Top-Left"},
@@ -180,20 +182,16 @@ LOCALE = {
     "log_connect_failed_output": {"zh": "[WARN] 连接可能失败: {output}", "en": "[WARN] Connection may have failed: {output}"},
     "log_connect_timeout": {"zh": "[ERROR] 连接超时。请检查 IP 是否正确。", "en": "[ERROR] Connection timed out. Check if the IP is correct."},
     "log_connect_exception": {"zh": "[ERROR] 连接失败: {e}", "en": "[ERROR] Failed to connect: {e}"},
-    "log_scrcpy_not_found": {"zh": "[ERROR] scrcpy-core.exe 未找到: {path}", "en": "[ERROR] scrcpy-core.exe not found at: {path}"},
+    "log_scrcpy_not_found": {"zh": "[ERROR] 未找到 scrcpy 核心程序: {path}", "en": "[ERROR] scrcpy core not found at: {path}"},
     "log_launch_failed": {"zh": "[ERROR] Scrcpy 启动失败: {e}", "en": "[ERROR] Failed to launch scrcpy: {e}"},
     "log_scrcpy_exit_code": {"zh": "[WARN] Scrcpy 异常退出，代码: {code}", "en": "[WARN] Scrcpy exited with code: {code}"},
     "log_read_error": {"zh": "[ERROR] 读取 Scrcpy 输出时出错: {e}", "en": "[ERROR] Error reading scrcpy output: {e}"},
     "log_autoconfig_device": {"zh": "设备", "en": "Device"},
     "log_autoconfig_screen": {"zh": "屏幕", "en": "Screen"},
     "log_autoconfig_recommend": {"zh": "[AutoConfig] 推荐", "en": "[AutoConfig] Recommended"},
-    # Disconnect device
-    "disconnect_btn": {"zh": "✕", "en": "✕"},
+    # Wireless device management
     "log_disconnected_wireless": {"zh": "[INFO] 已断开无线设备连接: {device}", "en": "[INFO] Disconnected wireless device: {device}"},
     "log_disconnect_failed": {"zh": "[ERROR] 断开设备失败: {e}", "en": "[ERROR] Failed to disconnect device: {e}"},
-    "log_usb_cannot_disconnect": {"zh": "[WARN] USB 设备无法手动断开，请直接拔掉数据线。", "en": "[WARN] USB devices cannot be disconnected manually. Please unplug the cable."},
-    "log_no_device_to_disconnect": {"zh": "[WARN] 未选择有效设备。", "en": "[WARN] No valid device selected."},
-    "log_attempting_disconnect": {"zh": "[INFO] 正在断开设备: {device}...", "en": "[INFO] Disconnecting device: {device}..."},
     # Clear logs button
     "clear_logs_btn": {"zh": "清空日志", "en": "Clear Logs"},
     # Wireless first-time hint
@@ -231,7 +229,10 @@ TUTORIAL_PAGES = [
 
 2. 返回设置 → 开发者选项 → 开启【USB 调试】。
 
-3. 连接电脑后，手机上弹出授权框，请点击【允许】。"""
+3. 连接电脑后，手机上弹出授权框，请勾选【始终允许】并点击【允许】。
+
+4. OPPO / ColorOS / vivo 特别提示：
+请在开发者选项开启【禁止权限监控】和【停用 adb 授权超时功能】，并将默认 USB 配置改为【文件传输】；勾选本软件【保持常亮】，可彻底避免息屏后被系统断连。"""
     },
     {
         "title": "📶 无线投屏步骤",
@@ -554,12 +555,47 @@ class AutoConfig:
 class ScrcpyLauncher(ctk.CTk):
     """Main application window for Scrcpy Ultra Launcher."""
     
-    # Path to scrcpy core executable (renamed from scrcpy.exe to avoid recursion)
-    SCRCPY_EXE = "scrcpy-core.exe"
+    # Path to scrcpy core executable
+    SCRCPY_EXE = "scrcpy.exe"
     
     # Config file for saving user preferences
     CONFIG_FILE = "config.json"
     
+    def _locate_scrcpy(self) -> str:
+        """定位 scrcpy 核心可执行文件路径。
+        
+        查找优先级：
+        1. internal/scrcpy.exe (官方 Release 解压后的默认原版文件名)
+        2. internal/scrcpy-core.exe (若用户已按早期文档重命名)
+        3. scrcpy-core.exe (早期单目录结构兼容，注意排除根目录下的本启动器 scrcpy.exe)
+        """
+        candidates = [
+            os.path.join(self.internal_dir, "scrcpy.exe"),
+            os.path.join(self.internal_dir, "scrcpy-core.exe"),
+            os.path.join(self.app_dir, "scrcpy-core.exe"),
+        ]
+        for path in candidates:
+            if os.path.isfile(path):
+                return path
+        return os.path.join(self.internal_dir, "scrcpy.exe")
+
+    def _locate_adb(self) -> str:
+        """定位 adb 可执行文件路径。
+        
+        查找优先级：
+        1. internal/adb.exe
+        2. adb.exe (根目录)
+        3. 系统 PATH 中的 adb
+        """
+        candidates = [
+            os.path.join(self.internal_dir, "adb.exe"),
+            os.path.join(self.app_dir, "adb.exe"),
+        ]
+        for path in candidates:
+            if os.path.isfile(path):
+                return path
+        return "adb"
+
     def __init__(self):
         # Set Windows AppUserModelID for proper taskbar icon display
         # This must be done BEFORE creating the window
@@ -579,19 +615,10 @@ class ScrcpyLauncher(ctk.CTk):
         self.internal_dir = os.path.join(self.app_dir, "internal")
         self.tools_dir = os.path.join(self.internal_dir, "tools")
         
-        # Core executable paths
-        self.scrcpy_path = os.path.join(self.internal_dir, self.SCRCPY_EXE)
-        self.adb_path = os.path.join(self.internal_dir, "adb.exe")
-        
-        # Pre-set icon path and load icon early (before any UI changes)
+        # Core executable paths (dynamically located)
+        self.scrcpy_path = self._locate_scrcpy()
+        self.adb_path = self._locate_adb()
         self.icon_path = None
-        try:
-            icon_path = get_resource_path("icon.ico")
-            if os.path.exists(icon_path):
-                self.icon_path = icon_path
-                self.iconbitmap(self.icon_path)
-        except Exception:
-            pass
         
         self._setup_window()
         self._create_variables()
@@ -615,20 +642,20 @@ class ScrcpyLauncher(ctk.CTk):
         # Bind window close event to save config
         self.protocol("WM_DELETE_WINDOW", self._on_window_close)
     
+    def _center_window(self, width: int, height: int) -> None:
+        """Center the window on screen with given dimensions."""
+        self.update_idletasks()
+        x = (self.winfo_screenwidth() - width) // 2
+        y = (self.winfo_screenheight() - height) // 2
+        self.geometry(f"{width}x{height}+{x}+{y}")
+    
     def _setup_window(self) -> None:
         """Configure the main window properties."""
         self.title("Scrcpy Ultra Launcher")
         self.geometry("850x620")
         self.resizable(False, False)
-        
-        # Set window icon if available
         self._set_window_icon()
-        
-        # Center the window on screen
-        self.update_idletasks()
-        x = (self.winfo_screenwidth() - 850) // 2
-        y = (self.winfo_screenheight() - 620) // 2
-        self.geometry(f"850x620+{x}+{y}")
+        self._center_window(850, 620)
     
     def _set_window_icon(self) -> None:
         """Set window icon from icon.ico or icon.png if available.
@@ -636,17 +663,12 @@ class ScrcpyLauncher(ctk.CTk):
         Icon files are bundled INSIDE the EXE via --add-data,
         so we use get_resource_path() to locate them in sys._MEIPASS.
         """
-        # Don't reset icon_path if already set in __init__
-        if not hasattr(self, 'icon_path') or not self.icon_path:
-            self.icon_path = None
-        
         try:
             # Try .ico first (preferred for Windows)
             icon_path = get_resource_path("icon.ico")
             if os.path.exists(icon_path):
-                self.icon_path = icon_path  # Save for later use
+                self.icon_path = icon_path
                 self.iconbitmap(icon_path)
-                # Also set using wm_iconbitmap for better persistence
                 self.wm_iconbitmap(default=icon_path)
                 return
             
@@ -658,26 +680,25 @@ class ScrcpyLauncher(ctk.CTk):
                 photo = ImageTk.PhotoImage(img)
                 self.iconphoto(True, photo)
                 self._icon_photo = photo  # Keep reference to prevent garbage collection
-                self.icon_path = png_path  # Save for later use (though .png uses different method)
+                self.icon_path = png_path
                 return
-            
-            print("[INFO] No icon file found (icon.ico or icon.png)")
-            
         except Exception as e:
-            # Icon setting is optional, just log and continue
             print(f"[INFO] Could not set window icon: {e}")
     
     def _create_variables(self) -> None:
         """Initialize tkinter variables for UI state."""
         self.selected_device = ctk.StringVar(value="Scanning...")
+        self.stay_awake = ctk.BooleanVar(value=True)  # Keep device awake while plugged in (prevents sleep disconnect)
         self.screen_off_on_start = ctk.BooleanVar(value=False)
         self.borderless_mode = ctk.BooleanVar(value=False)
+        self.auto_exit_on_close = ctk.BooleanVar(value=False)  # Only exit app on mirror close if explicitly enabled
         self.window_position = ctk.StringVar(value="center")  # center, top-left, top-right
         self.show_log_on_start = ctk.BooleanVar(value=True)  # Show log window or hide GUI
         self.print_fps = ctk.BooleanVar(value=False)  # Print real-time FPS
         
-        # Silent mode process tracking
+        # Silent mode process tracking & monitoring state
         self.current_scrcpy_process = None
+        self._in_monitoring_mode = False
         
         # Stream parameters
         self.param_resolution = ctk.StringVar(value="1080P (1920)")
@@ -1086,12 +1107,16 @@ class ScrcpyLauncher(ctk.CTk):
         self.position_menu.set(self._position_values[current_pos])
         
         # Bottom section
+        if hasattr(self, 'stay_awake_checkbox'):
+            self.stay_awake_checkbox.configure(text=LOCALE["stay_awake"][lang])
         self.screen_off_checkbox.configure(text=LOCALE["screen_off"][lang])
         self.screen_off_warning_label.configure(text=LOCALE["screen_off_warning"][lang])
         self.borderless_checkbox.configure(text=LOCALE["borderless"][lang])
         self.borderless_hint_label.configure(text=LOCALE["borderless_hint"][lang])
         self.show_log_checkbox.configure(text=LOCALE["show_log"][lang])
         self.print_fps_checkbox.configure(text=LOCALE["print_fps"][lang])
+        if hasattr(self, 'auto_exit_checkbox'):
+            self.auto_exit_checkbox.configure(text=LOCALE["auto_exit"][lang])
         self.start_button.configure(text=LOCALE["start_btn"][lang])
         
         # Log section
@@ -1125,7 +1150,6 @@ class ScrcpyLauncher(ctk.CTk):
             self._auto_config_applied = True
             
             # Build status message
-            # Build status message
             device_model = rec["device_model"]
             pc_ram = rec["pc_ram"]
             self.auto_config_label.configure(
@@ -1149,8 +1173,21 @@ class ScrcpyLauncher(ctk.CTk):
         """Create the options and start button section."""
         self.bottom_frame = ctk.CTkFrame(self.setup_frame, fg_color="transparent")
         
-        # Checkbox container for 2x2 grid layout
+        # Checkbox container for 2x3 grid layout
         self.checkbox_grid = ctk.CTkFrame(self.bottom_frame, fg_color="transparent")
+        
+        # Stay awake checkbox - keep device awake while plugged in
+        self.stay_awake_checkbox = ctk.CTkCheckBox(
+            self.checkbox_grid,
+            text=LOCALE["stay_awake"][self.current_lang],
+            variable=self.stay_awake,
+            font=ctk.CTkFont(size=13, weight="bold"),
+            fg_color="#00BFFF",
+            hover_color="#4169E1",
+            text_color="#CCCCCC",
+            checkbox_width=20,
+            checkbox_height=20
+        )
         
         # Screen off checkbox - bold style
         self.screen_off_checkbox = ctk.CTkCheckBox(
@@ -1216,6 +1253,19 @@ class ScrcpyLauncher(ctk.CTk):
             self.checkbox_grid,
             text=LOCALE["print_fps"][self.current_lang],
             variable=self.print_fps,
+            font=ctk.CTkFont(size=13, weight="bold"),
+            fg_color="#00BFFF",
+            hover_color="#4169E1",
+            text_color="#CCCCCC",
+            checkbox_width=20,
+            checkbox_height=20
+        )
+        
+        # Auto exit on close checkbox
+        self.auto_exit_checkbox = ctk.CTkCheckBox(
+            self.checkbox_grid,
+            text=LOCALE["auto_exit"][self.current_lang],
+            variable=self.auto_exit_on_close,
             font=ctk.CTkFont(size=13, weight="bold"),
             fg_color="#00BFFF",
             hover_color="#4169E1",
@@ -1316,27 +1366,29 @@ class ScrcpyLauncher(ctk.CTk):
         # Title and auto-config label in a row
         title_row = ctk.CTkFrame(self.middle_frame, fg_color="transparent")
         title_row.pack(fill="x", padx=15, pady=(2, 2))
-        self.params_title.pack_forget()  # Remove from previous layout
         self.params_title.pack(in_=title_row, side="left")
         self.auto_config_label.pack(in_=title_row, side="right")
         
         self.params_container.pack(fill="x", padx=10, pady=(0, 10))
         
-        # Layout bottom section - compact 2x2 checkbox grid
+        # Layout bottom section - compact 2x3 checkbox grid
         self.bottom_frame.grid(row=2, column=0, pady=(3, 6), in_=self.setup_frame)
         
-        # Checkbox grid: 2 rows x 2 columns
+        # Checkbox grid: 2 rows x 3 columns
         self.checkbox_grid.pack(pady=(0, 5))
-        self.checkbox_grid.grid_columnconfigure(0, weight=1, minsize=180)
-        self.checkbox_grid.grid_columnconfigure(1, weight=1, minsize=180)
+        self.checkbox_grid.grid_columnconfigure(0, weight=1, minsize=160)
+        self.checkbox_grid.grid_columnconfigure(1, weight=1, minsize=160)
+        self.checkbox_grid.grid_columnconfigure(2, weight=1, minsize=160)
         
-        # Row 0: Screen Off, Borderless
-        self.screen_off_checkbox.grid(row=0, column=0, padx=15, pady=3, sticky="w")
-        self.borderless_checkbox.grid(row=0, column=1, padx=15, pady=3, sticky="w")
+        # Row 0: Stay Awake, Screen Off, Borderless
+        self.stay_awake_checkbox.grid(row=0, column=0, padx=10, pady=3, sticky="w")
+        self.screen_off_checkbox.grid(row=0, column=1, padx=10, pady=3, sticky="w")
+        self.borderless_checkbox.grid(row=0, column=2, padx=10, pady=3, sticky="w")
         
-        # Row 1: Show Log, Print FPS
-        self.show_log_checkbox.grid(row=1, column=0, padx=15, pady=3, sticky="w")
-        self.print_fps_checkbox.grid(row=1, column=1, padx=15, pady=3, sticky="w")
+        # Row 1: Show Log, Print FPS, Auto Exit
+        self.show_log_checkbox.grid(row=1, column=0, padx=10, pady=3, sticky="w")
+        self.print_fps_checkbox.grid(row=1, column=1, padx=10, pady=3, sticky="w")
+        self.auto_exit_checkbox.grid(row=1, column=2, padx=10, pady=3, sticky="w")
         
         # Warning labels are not packed by default (hidden)
         # They will be shown/hidden by callbacks
@@ -1377,6 +1429,10 @@ class ScrcpyLauncher(ctk.CTk):
                     self.param_bitrate.set(config["bitrate"])
                 if "codec" in config:
                     self.param_codec.set(config["codec"])
+                if "stay_awake" in config and hasattr(self, 'stay_awake'):
+                    self.stay_awake.set(config["stay_awake"])
+                if "auto_exit_on_close" in config and hasattr(self, 'auto_exit_on_close'):
+                    self.auto_exit_on_close.set(config["auto_exit_on_close"])
                 if "screen_off" in config:
                     self.screen_off_on_start.set(config["screen_off"])
                 if "last_ip" in config:
@@ -1404,43 +1460,6 @@ class ScrcpyLauncher(ctk.CTk):
             self.last_wireless_ip = ""
             self.show_tutorial = True
     
-    def _save_config_internal(self) -> None:
-        """Internal config save - used during initialization when widgets may not exist yet."""
-        config_path = os.path.join(self.app_dir, self.CONFIG_FILE)
-        
-        # Try to get widget values if they exist, otherwise use defaults/cached values
-        try:
-            resolution = self.param_resolution.get() if hasattr(self, 'param_resolution') else "1080P (1920)"
-            fps = self.param_fps.get() if hasattr(self, 'param_fps') else "60 fps"
-            bitrate = self.param_bitrate.get() if hasattr(self, 'param_bitrate') else 10
-            codec = self.param_codec.get() if hasattr(self, 'param_codec') else "H.264 (Low Latency)"
-            screen_off = self.screen_off_on_start.get() if hasattr(self, 'screen_off_on_start') else False
-        except:
-            # Fallback if widgets not created yet
-            resolution = "1080P (1920)"
-            fps = "60 fps"
-            bitrate = 10
-            codec = "H.264 (Low Latency)"
-            screen_off = False
-            
-        config = {
-            "resolution": resolution,
-            "fps": fps,
-            "bitrate": bitrate,
-            "codec": codec,
-            "user_has_custom_settings": getattr(self, "_user_has_custom_settings", False),
-            "screen_off": screen_off,
-            "last_ip": getattr(self, "last_wireless_ip", ""),
-            "language": getattr(self, "current_lang", "zh"),
-            "show_tutorial": getattr(self, "show_tutorial", True)
-        }
-        try:
-            with open(config_path, "w", encoding="utf-8") as f:
-                json.dump(config, f, indent=2, ensure_ascii=False)
-            print(f"[INFO] Config saved (internal) to {self.CONFIG_FILE}")
-        except Exception as e:
-            print(f"[ERROR] Failed to save config: {e}")
-    
     def _save_config(self) -> None:
         """Save current configuration to config.json."""
         config_path = os.path.join(self.app_dir, self.CONFIG_FILE)
@@ -1449,11 +1468,13 @@ class ScrcpyLauncher(ctk.CTk):
             "fps": self.param_fps.get(),
             "bitrate": self.param_bitrate.get(),
             "codec": self.param_codec.get(),
+            "stay_awake": self.stay_awake.get(),
+            "auto_exit_on_close": self.auto_exit_on_close.get(),
             "screen_off": self.screen_off_on_start.get(),
             "last_ip": getattr(self, "last_wireless_ip", ""),
             "language": self.current_lang,
             "show_tutorial": getattr(self, "show_tutorial", True),
-            "user_has_custom_settings": getattr(self, "_user_has_custom_settings", False)
+            "user_has_custom_settings": self._user_has_custom_settings
         }
         try:
             with open(config_path, "w", encoding="utf-8") as f:
@@ -1630,10 +1651,6 @@ class ScrcpyLauncher(ctk.CTk):
         except Exception as e:
             self._log(f"[ERROR] Failed to disconnect {serial}: {e}")
     
-    def _remove_from_device_history(self, ip_address: str) -> None:
-        """Remove a device from history by IP address - kept for compatibility."""
-        pass  # No longer used, we use adb disconnect instead
-    
     def _clear_device_history(self) -> None:
         """Disconnect all wireless devices and clear saved IP."""
         wireless_devices = self._get_wireless_devices_from_dropdown()
@@ -1798,68 +1815,6 @@ class ScrcpyLauncher(ctk.CTk):
         self.log_textbox.configure(state="normal")
         self.log_textbox.delete("0.0", "end")
         self.log_textbox.configure(state="disabled")
-    
-
-
-    def _on_disconnect_clicked(self) -> None:
-        """Handle disconnect button click."""
-        self._disconnect_current_device()
-    
-    def _disconnect_current_device(self) -> None:
-        """Disconnect the currently selected device."""
-        display_name = self.selected_device.get()
-        lang = self.current_lang
-        
-        # Check if a valid device is selected
-        invalid_values = (
-            "Scanning...", "正在扫描...",
-            LOCALE["scanning"]["zh"], LOCALE["scanning"]["en"],
-            LOCALE["no_device"]["zh"], LOCALE["no_device"]["en"]
-        )
-        if not display_name or display_name in invalid_values:
-            self._log(LOCALE["log_no_device_to_disconnect"][lang])
-            return
-        
-        # Get the actual serial from the display name mapping
-        device_serial_map = getattr(self, "_device_serial_map", {})
-        serial = device_serial_map.get(display_name, display_name)
-        
-        # Check if it's a wireless device (IP:port format) or has special status
-        is_wireless = bool(re.match(r'^\d+\.\d+\.\d+\.\d+:\d+$', serial))
-        
-        # Also check if display name contains offline/unauthorized indicators
-        # These might be zombie connections that should be disconnected
-        is_zombie = any(indicator in display_name.lower() for indicator in 
-                       ["offline", "unauthorized", "未授权", "离线"])
-        
-        if is_wireless or is_zombie:
-            # Wireless device or zombie connection - can disconnect
-            self._log(LOCALE["log_attempting_disconnect"][lang].format(device=serial))
-            try:
-                result = subprocess.run(
-                    [self.adb_path, "disconnect", serial],
-                    capture_output=True,
-                    text=True,
-                    timeout=10,
-                    creationflags=subprocess.CREATE_NO_WINDOW
-                )
-                
-                if result.returncode == 0 or "disconnected" in result.stdout.lower():
-                    self._log(LOCALE["log_disconnected_wireless"][lang].format(device=serial))
-                else:
-                    # Still log as success since adb disconnect doesn't always return proper status
-                    self._log(LOCALE["log_disconnected_wireless"][lang].format(device=serial))
-                
-                # Refresh device list
-                self._scan_devices()
-                
-            except subprocess.TimeoutExpired:
-                self._log(LOCALE["log_adb_timeout"][lang])
-            except Exception as e:
-                self._log(LOCALE["log_disconnect_failed"][lang].format(e=e))
-        else:
-            # USB device - cannot disconnect via software
-            self._log(LOCALE["log_usb_cannot_disconnect"][lang])
 
     def _on_refresh_clicked(self) -> None:
         """Handle refresh button click."""
@@ -1921,22 +1876,16 @@ class ScrcpyLauncher(ctk.CTk):
             output = result.stdout
             self._log(f"[DEBUG] ip route output: {output.strip()[:100]}...")
             
-            # Look for wlan0 interface with src IP
-            # Format: ... dev wlan0 proto kernel scope link src 192.168.x.x
-            match = re.search(r'dev\s+wlan0\s+.*?src\s+(\d+\.\d+\.\d+\.\d+)', output)
-            if match:
-                ip = match.group(1)
-                self._log(f"[INFO] Detected device IP: {ip}")
-                return ip
+            # Look for WLAN interface with src IP
+            for line in output.splitlines():
+                if "wlan" in line:
+                    match = re.search(r'src\s+(\d+\.\d+\.\d+\.\d+)', line)
+                    if match:
+                        ip = match.group(1)
+                        self._log(f"[INFO] Detected device IP: {ip}")
+                        return ip
             
-            # Alternative pattern for some devices
-            match = re.search(r'src\s+(\d+\.\d+\.\d+\.\d+)\s+.*?wlan0', output)
-            if match:
-                ip = match.group(1)
-                self._log(f"[INFO] Detected device IP: {ip}")
-                return ip
-            
-            self._log("[WARN] Could not find wlan0 IP in route output.")
+            self._log("[WARN] Could not find wlan IP in route output.")
             return None
             
         except subprocess.TimeoutExpired:
@@ -1984,8 +1933,8 @@ class ScrcpyLauncher(ctk.CTk):
     def _show_manual_ip_dialog(self) -> None:
         """Show dialog for manual IP input."""
         dialog = ctk.CTkInputDialog(
-            text="请输入手机 IP 地址:\n\n提示：请前往 手机设置 -> 关于手机 -> 状态信息 查看 IP",
-            title="无线连接向导"
+            text=LOCALE["wireless_prompt"][self.current_lang],
+            title=LOCALE["wireless_title"][self.current_lang]
         )
         
         # Pre-fill with last used IP if available
@@ -2015,6 +1964,8 @@ class ScrcpyLauncher(ctk.CTk):
             # Parse the output
             lines = result.stdout.strip().split("\n")
             device_serials = []
+            offline_serials = []
+            unauthorized_serials = []
             
             for line in lines[1:]:  # Skip the first line ("List of devices attached")
                 line = line.strip()
@@ -2022,6 +1973,15 @@ class ScrcpyLauncher(ctk.CTk):
                     serial, status = line.split("\t", 1)
                     if status == "device":  # Only include ready devices
                         device_serials.append(serial)
+                    elif status == "offline":
+                        offline_serials.append(serial)
+                    elif status == "unauthorized":
+                        unauthorized_serials.append(serial)
+            
+            if offline_serials:
+                self._log(f"[WARN] 检测到设备 {', '.join(offline_serials)} 处于离线状态 (offline)，请点亮并解锁手机屏幕。")
+            if unauthorized_serials:
+                self._log(f"[WARN] 检测到设备 {', '.join(unauthorized_serials)} 未授权 (unauthorized)，请在手机屏幕上点击「始终允许此电脑调试」。")
             
             if device_serials:
                 self._log(LOCALE["log_getting_info"][self.current_lang])
@@ -2050,59 +2010,32 @@ class ScrcpyLauncher(ctk.CTk):
     
     def _get_device_display_name(self, serial: str) -> str:
         """Get a friendly display name for a device (Manufacturer Model (serial))."""
-        # Check if it's a wireless device (IP:port format)
         is_wireless = bool(re.match(r'^\d+\.\d+\.\d+\.\d+:\d+$', serial))
         lang = self.current_lang
-        
-        # Get localized suffixes
-        wireless_suffix = LOCALE["device_wireless"][lang]
-        unauthorized_suffix = LOCALE["device_unauthorized"][lang]
+        suffix = LOCALE["device_wireless"][lang] if is_wireless else serial
         
         try:
-            # Get manufacturer
-            manufacturer_result = subprocess.run(
+            mfg = subprocess.run(
                 [self.adb_path, "-s", serial, "shell", "getprop", "ro.product.manufacturer"],
-                capture_output=True,
-                text=True,
-                timeout=5,
+                capture_output=True, text=True, timeout=5,
                 creationflags=subprocess.CREATE_NO_WINDOW
-            )
-            manufacturer = manufacturer_result.stdout.strip()
+            ).stdout.strip()
             
-            # Get model
-            model_result = subprocess.run(
+            model = subprocess.run(
                 [self.adb_path, "-s", serial, "shell", "getprop", "ro.product.model"],
-                capture_output=True,
-                text=True,
-                timeout=5,
+                capture_output=True, text=True, timeout=5,
                 creationflags=subprocess.CREATE_NO_WINDOW
-            )
-            model = model_result.stdout.strip()
+            ).stdout.strip()
             
-            if manufacturer and model:
-                # Format: "Manufacturer Model (serial)" or with wireless indicator
-                if is_wireless:
-                    return f"{manufacturer} {model} ({wireless_suffix})"
-                else:
-                    return f"{manufacturer} {model} ({serial})"
-            else:
-                # Failed to get info, use serial only
-                if is_wireless:
-                    return f"{serial} ({wireless_suffix})"
-                else:
-                    return serial
-                    
+            if mfg and model:
+                return f"{mfg} {model} ({suffix})"
         except subprocess.TimeoutExpired:
-            # Device might be unauthorized or offline
-            if is_wireless:
-                return f"{serial} ({wireless_suffix})"
-            else:
-                return f"{serial} ({unauthorized_suffix})"
+            if not is_wireless:
+                suffix = LOCALE["device_unauthorized"][lang]
         except Exception:
-            if is_wireless:
-                return f"{serial} ({wireless_suffix})"
-            else:
-                return serial
+            pass
+            
+        return f"{serial} ({suffix})" if is_wireless else serial
     
     def _update_device_dropdown(self, display_names: list[str]) -> None:
         """Update the device selector with scanned devices."""
@@ -2209,6 +2142,14 @@ class ScrcpyLauncher(ctk.CTk):
         device_serial_map = getattr(self, "_device_serial_map", {})
         device = device_serial_map.get(display_name, display_name)
         
+        # Ensure scrcpy executable exists before proceeding
+        if not os.path.isfile(self.scrcpy_path):
+            self.scrcpy_path = self._locate_scrcpy()
+            
+        if not os.path.isfile(self.scrcpy_path):
+            self._log(LOCALE["log_scrcpy_not_found"][self.current_lang].format(path=self.scrcpy_path))
+            return
+            
         # Build the command as a list
         command = [self.scrcpy_path]
         
@@ -2219,7 +2160,6 @@ class ScrcpyLauncher(ctk.CTk):
         resolution = self.param_resolution.get()
         if resolution != "Native":
             # Extract number: "1080P (1920)" -> "1920", "2K (2560)" -> "2560"
-            import re
             res_match = re.search(r'\((\d+)\)', resolution)
             if res_match:
                 command.extend(["-m", res_match.group(1)])
@@ -2236,6 +2176,10 @@ class ScrcpyLauncher(ctk.CTk):
         # Bitrate
         bitrate = self.param_bitrate.get()
         command.extend(["-b", f"{bitrate}M"])
+        
+        # Stay awake (keep device awake while connected to prevent sleep disconnect)
+        if self.stay_awake.get():
+            command.append("--stay-awake")
         
         # Screen off
         screen_off = self.screen_off_on_start.get()
@@ -2273,11 +2217,12 @@ class ScrcpyLauncher(ctk.CTk):
         self._log("=" * 50)
         
         # Launch scrcpy asynchronously and capture output
-        # Note: scrcpy must run from internal_dir to find its DLLs and scrcpy-server
+        # Note: scrcpy must run from its own directory to find its DLLs and scrcpy-server
+        scrcpy_cwd = os.path.dirname(self.scrcpy_path) if os.path.isfile(self.scrcpy_path) else self.internal_dir
         try:
             process = subprocess.Popen(
                 command,
-                cwd=self.internal_dir,
+                cwd=scrcpy_cwd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
@@ -2324,6 +2269,8 @@ class ScrcpyLauncher(ctk.CTk):
     
     def _enter_monitoring_mode(self) -> None:
         """Transform UI to monitoring mode - hide setup, show only log."""
+        self._in_monitoring_mode = True
+        
         # Hide setup frame
         self.setup_frame.grid_remove()
         
@@ -2331,12 +2278,7 @@ class ScrcpyLauncher(ctk.CTk):
         self.geometry("850x300")
         self.resizable(True, True)  # Allow resize in monitoring mode
         self.minsize(400, 200)
-        
-        # Re-center window
-        self.update_idletasks()
-        x = (self.winfo_screenwidth() - 850) // 2
-        y = (self.winfo_screenheight() - 300) // 2
-        self.geometry(f"850x300+{x}+{y}")
+        self._center_window(850, 300)
         
         # Force reload icon multiple times to prevent taskbar icon disappearing (PyInstaller fix)
         # Windows sometimes resets icon during window geometry changes
@@ -2345,7 +2287,56 @@ class ScrcpyLauncher(ctk.CTk):
         # Update window title to indicate monitoring mode
         self.title("Scrcpy Monitor - 投屏监控中...")
         
-        self._log("[INFO] 已进入监控模式，关闭投屏窗口后程序将自动退出")
+        self._log("[INFO] 已进入监控模式，投屏结束后将自动恢复主配置界面")
+    
+    def _exit_monitoring_mode(self, return_code: int = 0) -> None:
+        """Exit monitoring mode and restore setup UI with diagnostic feedback."""
+        if not getattr(self, '_in_monitoring_mode', False):
+            return
+        self._in_monitoring_mode = False
+        
+        # If user explicitly opted in to quit on mirror close, exit cleanly
+        if self.auto_exit_on_close.get():
+            self._log_threadsafe("[INFO] 投屏已结束，根据设置准备退出程序...")
+            time.sleep(0.5)
+            self._exit_application()
+            return
+            
+        # Restore setup frame and normal window dimensions
+        self.setup_frame.grid()
+        self.geometry("850x620")
+        self.resizable(False, False)
+        self._center_window(850, 620)
+        
+        self._force_reload_icon()
+        self.title(LOCALE["window_title"][self.current_lang])
+        self.start_button.configure(state="normal")
+        self.current_scrcpy_process = None
+        
+        # Provide detailed feedback and troubleshooting guide
+        if return_code == 0:
+            self._log("[INFO] 投屏已正常结束，已恢复主配置界面。")
+        else:
+            self._log(f"[WARN] 投屏异常结束 (退出代码: {return_code})")
+            if return_code == 2:
+                self._log("=" * 60)
+                self._log("[!] 诊断：退出代码 2 表示「设备连接意外断开/设备离线 (offline)」。")
+                self._log("    常见原因与排查方案：")
+                self._log("    1. 【保持常亮】：务必勾选「保持常亮 (防休眠断开)」，防止手机息屏后系统停止后台推流。")
+                self._log("    2. 【OPPO / ColorOS 必备设置】：")
+                self._log("       • 前往【设置 -> 开发者选项】，开启【禁止权限监控】和【停用 adb 授权超时功能】；")
+                self._log("       • 连接电脑时下拉通知栏，将默认 USB 连接方式改为【文件传输 (MTP)】而非「仅充电」；")
+                self._log("       • 在【电池 -> 耗电管理】中允许相关后台运行，避免系统自动杀后台进程。")
+                self._log("    3. 【降低负载】：如使用了 Native+120fps+H.265 超高规格，手机过热可能触发温控杀死编码器。")
+                self._log("       建议先尝试 1080P + 60fps + H.264，确认连接稳定后再逐步提高。")
+                self._log("    4. 【线材与接口】：避免使用松动的机箱前置 USB 口或拓展坞，尽量直连主板后置接口。")
+                self._log("=" * 60)
+            elif return_code == 1:
+                self._log("[!] 诊断：退出代码 1 表示「启动失败或编码器/参数不支持」。")
+                self._log("    建议尝试将编码改为 H.264，或降低分辨率 (如 1080P) 后重新连接。")
+        
+        # Automatically refresh device status
+        self.after(500, self._scan_devices)
     
     def _monitor_silent_process(self) -> None:
         """Monitor scrcpy process in silent/pure mode.
@@ -2357,15 +2348,22 @@ class ScrcpyLauncher(ctk.CTk):
         
         # Check if process has exited
         if self.current_scrcpy_process.poll() is not None:
-            # Process has ended - restore main window
+            return_code = self.current_scrcpy_process.poll()
             self.current_scrcpy_process = None
+            if self.auto_exit_on_close.get():
+                self._exit_application()
+                return
             self.deiconify()  # Show the main window again
             self.lift()  # Bring to front
             self.focus_force()  # Focus the window
-            self._log("[INFO] 投屏已结束，主窗口已恢复")
+            if return_code == 0:
+                self._log("[INFO] 投屏已结束，主窗口已恢复")
+            else:
+                self._log(f"[WARN] 投屏异常结束 (退出代码: {return_code})，主窗口已恢复")
             
             # Re-enable start button if needed
             self.start_button.configure(state="normal")
+            self.after(500, self._scan_devices)
         else:
             # Process still running - check again in 500ms
             self.after(500, self._monitor_silent_process)
@@ -2395,18 +2393,14 @@ class ScrcpyLauncher(ctk.CTk):
         self.after(500, set_icon)
     
     def _monitor_scrcpy_process(self, process: subprocess.Popen) -> None:
-        """Monitor scrcpy process and exit launcher when it ends."""
-        while True:
-            # Check if process is still running
-            if process.poll() is not None:
-                # Process has ended
-                self._log_threadsafe("[INFO] 检测到投屏窗口已关闭，准备退出...")
-                # Give a short delay for final log messages
-                time.sleep(0.5)
-                # Exit the application from main thread
-                self.after(0, self._exit_application)
-                break
-            time.sleep(1)  # Check every second
+        """Monitor scrcpy process lifecycle and restore GUI when it ends."""
+        try:
+            return_code = process.wait()
+            # Give a short delay for output reading thread to finish logging
+            time.sleep(0.3)
+            self.after(0, lambda: self._exit_monitoring_mode(return_code))
+        except Exception:
+            pass
     
     def _exit_application(self) -> None:
         """Cleanly exit the application."""
@@ -2432,6 +2426,9 @@ class ScrcpyLauncher(ctk.CTk):
                 
         except Exception as e:
             self._log_threadsafe(LOCALE["log_read_error"][self.current_lang].format(e=e))
+        finally:
+            # Ensure GUI restoration is scheduled on main thread
+            self.after(100, lambda: self._exit_monitoring_mode(process.poll() or 0))
 
 
 def main():
