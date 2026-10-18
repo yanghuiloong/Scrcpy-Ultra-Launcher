@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="internal/icon.png" alt="Scrcpy Ultra Launcher" width="128">
+  <img src="assets/icon.png" alt="Scrcpy Ultra Launcher" width="128">
 </p>
 
 <h1 align="center">Scrcpy Ultra Launcher</h1>
@@ -78,12 +78,14 @@ Scrcpy-Folder/
 ├── scrcpy.exe           ← 本启动器 (GUI Launcher)
 ├── config.json          ← 用户配置 (自动生成)
 ├── icon.ico             ← 程序图标 (可选)
-└── internal/            ← Scrcpy 官方原版解压目录
+├── assets/              ← 静态资源 (Logo 等)
+├── tools/               ← 辅助工具 (AltSnap 边框拖拽辅助等)
+└── internal/            ← 100% 官方 Scrcpy 原版解压目录 (覆盖即可无痛升级)
     ├── scrcpy.exe       ← 原版核心程序 (无需重命名)
     ├── scrcpy-server    ← Scrcpy 服务端
     ├── adb.exe          ← Android Debug Bridge
-    ├── *.dll            ← 依赖库
-    └── tools/           ← 辅助工具 (AltSnap等)
+    ├── *.dll            ← 官方运行库
+    └── ...
 ```
 
 ---
@@ -142,13 +144,16 @@ Scrcpy-Ultra-Launcher/
 ├── config.json          # 用户配置文件
 ├── README.md            # 说明文档
 ├── scrcpy.spec          # PyInstaller 配置
-└── internal/            # 内部资源及 Scrcpy 官方核心目录
-    ├── icon.png         # PNG 图标 (用于 README)
+├── assets/              # 图标与展示素材
+│   └── icon.png
+├── tools/               # 辅助工具 (AltSnap 边框拖动工具等)
+│   ├── AltSnap.exe
+│   └── AltSnap.ini
+└── internal/            # 100% 官方 Scrcpy 解压目录 (无痛覆盖升级)
     ├── scrcpy.exe       # Scrcpy 官方核心程序
     ├── adb.exe          # ADB 调试工具
     ├── scrcpy-server    # Scrcpy 服务端
-    ├── tools/           # 辅助工具 (AltSnap)
-    └── ...
+    └── *.dll            # 官方依赖库
 ```
 
 ---

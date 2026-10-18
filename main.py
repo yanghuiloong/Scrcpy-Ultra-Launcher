@@ -611,9 +611,9 @@ class ScrcpyLauncher(ctk.CTk):
         # For PyInstaller: this is the EXE's directory (not the temp extraction directory)
         self.app_dir = get_base_path()
         
-        # New directory structure: dependencies moved to subdirectories
+        # Directory structure: official scrcpy is in internal/, auxiliary tools in tools/
         self.internal_dir = os.path.join(self.app_dir, "internal")
-        self.tools_dir = os.path.join(self.internal_dir, "tools")
+        self.tools_dir = os.path.join(self.app_dir, "tools") if os.path.isdir(os.path.join(self.app_dir, "tools")) else os.path.join(self.internal_dir, "tools")
         
         # Core executable paths (dynamically located)
         self.scrcpy_path = self._locate_scrcpy()
@@ -672,16 +672,17 @@ class ScrcpyLauncher(ctk.CTk):
                 self.wm_iconbitmap(default=icon_path)
                 return
             
-            # Try .png as fallback
-            png_path = get_resource_path("icon.png")
-            if os.path.exists(png_path):
-                from PIL import Image, ImageTk
-                img = Image.open(png_path)
-                photo = ImageTk.PhotoImage(img)
-                self.iconphoto(True, photo)
-                self._icon_photo = photo  # Keep reference to prevent garbage collection
-                self.icon_path = png_path
-                return
+            # Try assets/icon.png or icon.png as fallback
+            for icon_candidate in ["assets/icon.png", "icon.png"]:
+                png_path = get_resource_path(icon_candidate)
+                if os.path.exists(png_path):
+                    from PIL import Image, ImageTk
+                    img = Image.open(png_path)
+                    photo = ImageTk.PhotoImage(img)
+                    self.iconphoto(True, photo)
+                    self._icon_photo = photo  # Keep reference to prevent garbage collection
+                    self.icon_path = png_path
+                    return
         except Exception as e:
             print(f"[INFO] Could not set window icon: {e}")
     
