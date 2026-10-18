@@ -886,7 +886,7 @@ class ScrcpyLauncher(ctk.CTk):
         self.resolution_dropdown = ctk.CTkComboBox(
             res_frame,
             variable=self.param_resolution,
-            values=["Native", "2K (2560)", "1080P (1920)", "720P (1280)"],
+            values=["Native", "4K (3840)", "3K (3200)", "2K (2560)", "1080P (1920)", "720P (1280)"],
             width=DROPDOWN_WIDTH,
             height=DROPDOWN_HEIGHT,
             font=ctk.CTkFont(size=12),
@@ -913,7 +913,7 @@ class ScrcpyLauncher(ctk.CTk):
         self.fps_dropdown = ctk.CTkComboBox(
             fps_frame,
             variable=self.param_fps,
-            values=["120 fps", "90 fps", "60 fps", "30 fps"],
+            values=["165 fps", "144 fps", "120 fps", "90 fps", "60 fps", "30 fps"],
             width=DROPDOWN_WIDTH,
             height=DROPDOWN_HEIGHT,
             font=ctk.CTkFont(size=12),
@@ -940,7 +940,7 @@ class ScrcpyLauncher(ctk.CTk):
         self.codec_dropdown = ctk.CTkComboBox(
             codec_frame,
             variable=self.param_codec,
-            values=["H.264 (Low Latency)", "H.265 (High Quality)"],
+            values=["AV1 (Ultra Quality)", "H.265 (High Quality)", "H.264 (Low Latency)"],
             width=DROPDOWN_WIDTH,
             height=DROPDOWN_HEIGHT,
             font=ctk.CTkFont(size=12),
@@ -979,8 +979,8 @@ class ScrcpyLauncher(ctk.CTk):
         self.bitrate_slider = ctk.CTkSlider(
             bitrate_frame,
             from_=4,
-            to=40,
-            number_of_steps=36,
+            to=100,
+            number_of_steps=96,
             variable=self.param_bitrate,
             width=340,
             height=12,
@@ -2171,7 +2171,12 @@ class ScrcpyLauncher(ctk.CTk):
         
         # Parse codec
         codec = self.param_codec.get()
-        codec_value = "h264" if "H.264" in codec else "h265"
+        if "AV1" in codec:
+            codec_value = "av1"
+        elif "H.264" in codec:
+            codec_value = "h264"
+        else:
+            codec_value = "h265"
         command.append(f"--video-codec={codec_value}")
         
         # Bitrate

@@ -34,3 +34,4 @@ Thumbs.db
 # --- 忽略本地说明与官方解压文本 ---
 *源项目.txt
 internal/LICENSE.txt
+internal/*.png

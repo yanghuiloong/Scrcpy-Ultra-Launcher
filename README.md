@@ -18,7 +18,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Platform-Windows-0078D6?logo=windows&logoColor=white" alt="Windows">
-  <img src="https://img.shields.io/badge/2K%20%7C%20120FPS-Supported-success" alt="2K 120FPS">
+  <img src="https://img.shields.io/badge/4K%20%7C%20165FPS%20%7C%20AV1-Supported-success" alt="4K 165FPS AV1">
 </p>
 
 ---
@@ -27,7 +27,7 @@
 
 **Scrcpy Ultra Launcher** 是一个为 [Scrcpy](https://github.com/Genymobile/scrcpy) 量身打造的现代化 GUI 启动器。
 
-它旨在解决 Scrcpy 命令行操作门槛高、参数记忆繁琐的问题，通过直观的图形界面和智能的硬件检测算法，让用户能够一键享受 **2K 分辨率**、**120Hz 高刷**的极致投屏体验。
+它旨在解决 Scrcpy 命令行操作门槛高、参数记忆繁琐的问题，通过直观的图形界面和智能的硬件检测算法，让用户能够一键享受 **4K/3K/2K 分辨率**、**165Hz/144Hz/120Hz 高刷**以及 **AV1 极清编码**的极致投屏体验。
 
 > **⚠️ 声明 / Disclaimer**
 >
@@ -52,11 +52,11 @@
 
 ### 支持的参数选项
 
-- **分辨率**: Native / 2K (2560) / 1080P (1920) / 720P (1280)
-- **帧率**: 120 fps / 90 fps / 60 fps / 30 fps
-- **编码**: H.264 (低延迟) / H.265 (高画质)
-- **码率**: 4-40 Mbps 可调
-- **其他**: 启动即熄屏、无线连接、设备断开
+- **分辨率**: Native (原生) / 4K (3840) / 3K (3200) / 2K (2560) / 1080P (1920) / 720P (1280)
+- **帧率**: 165 fps / 144 fps / 120 fps / 90 fps / 60 fps / 30 fps
+- **编码**: AV1 (极清高质量) / H.265 (高画质) / H.264 (低延迟兼容)
+- **码率**: 4-100 Mbps 宽幅可调
+- **其他**: 保持常亮、启动即熄屏、无边框贴靠、AltSnap拖拽、无线连接、设备历史管理
 
 ---
 

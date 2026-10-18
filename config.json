@@ -3,6 +3,8 @@
   "fps": "120 fps",
   "bitrate": 40,
   "codec": "H.265 (High Quality)",
+  "stay_awake": false,
+  "auto_exit_on_close": false,
   "screen_off": false,
   "last_ip": "",
   "language": "zh",
