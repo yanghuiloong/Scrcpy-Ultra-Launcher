@@ -1,7 +1,7 @@
 {
   "resolution": "Native",
   "fps": "120 fps",
-  "bitrate": 40,
+  "bitrate": 100,
   "codec": "H.265 (High Quality)",
   "stay_awake": false,
   "auto_exit_on_close": false,

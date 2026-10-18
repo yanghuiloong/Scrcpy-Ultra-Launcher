@@ -940,7 +940,7 @@ class ScrcpyLauncher(ctk.CTk):
         self.codec_dropdown = ctk.CTkComboBox(
             codec_frame,
             variable=self.param_codec,
-            values=["AV1 (Ultra Quality)", "H.265 (High Quality)", "H.264 (Low Latency)"],
+            values=["H.265 (High Quality - 推荐)", "H.264 (Low Latency)", "AV1 (需手机芯片支持硬编)"],
             width=DROPDOWN_WIDTH,
             height=DROPDOWN_HEIGHT,
             font=ctk.CTkFont(size=12),
@@ -1429,7 +1429,15 @@ class ScrcpyLauncher(ctk.CTk):
                 if "bitrate" in config:
                     self.param_bitrate.set(config["bitrate"])
                 if "codec" in config:
-                    self.param_codec.set(config["codec"])
+                    loaded_codec = config["codec"]
+                    if "H.265" in loaded_codec:
+                        self.param_codec.set("H.265 (High Quality - 推荐)")
+                    elif "H.264" in loaded_codec:
+                        self.param_codec.set("H.264 (Low Latency)")
+                    elif "AV1" in loaded_codec:
+                        self.param_codec.set("AV1 (需手机芯片支持硬编)")
+                    else:
+                        self.param_codec.set(loaded_codec)
                 if "stay_awake" in config and hasattr(self, 'stay_awake'):
                     self.stay_awake.set(config["stay_awake"])
                 if "auto_exit_on_close" in config and hasattr(self, 'auto_exit_on_close'):
